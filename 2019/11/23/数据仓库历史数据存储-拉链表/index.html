@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Head tag -->
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!--Description-->
+    
+        <meta name="description" content="数据仓库历史数据存储-拉链表假如我们有一个账号account表，我们需要在hive中存储（数据是从线上mysql读取binlog同步来的，是有明细变化的）
+1account表结构：account_id, username, followers_count, modified_at
+
+我们经常使用的存">
+    
+
+    <!--Author-->
+    
+        <meta name="author" content="upupfeng">
+    
+
+    <!--Open Graph Title-->
+    
+        <meta property="og:title" content="数据仓库历史数据存储 - 拉链表"/>
+    
+
+    <!--Open Graph Description-->
+    
+
+    <!--Open Graph Site Name-->
+    <meta property="og:site_name" content="upupfeng&#39;s blog"/>
+
+    <!--Type page-->
+    
+        <meta property="og:type" content="article" />
+    
+
+    <!--Page Cover-->
+    
+
+    <meta name="twitter:card" content="summary" />
+    
+
+    <!-- Title -->
+    
+    <title>数据仓库历史数据存储 - 拉链表 - upupfeng&#39;s blog</title>
+
+    <!-- Tachyons Core CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/tachyons/css/tachyons.min.css">
+
+    <!-- Custom Fonts -->
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="//oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="//oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/css/style.css">
+
+    <!-- Google Analytics -->
+    
+
+
+</head>
+
+
+<body>
+
+<!-- Main Content -->
+<!-- Banner -->
+<!-- Banner -->
+<div class="w-100 bg-1 ph5-ns ph3 text-light">
+    
+    <nav class="db dt-l w-100 mw8 center border-box pv3">
+        <a class="db dtc-l v-mid link dim w-100 w-25-l tc tl-l mb2 mb0-l white" href="/" title="upupfeng's blog">
+            <img src="/assets/face_nobg.png" class="dib h3" alt="upupfeng's blog">
+        </a>
+        <div class="db dtc-l v-mid w-100 w-75-l tc tr-l">
+            
+                <a class="link dim f6 f5-l dib mr3 mr4-l white" 
+                    href="/" 
+                    title="主页">
+                    主页
+                </a>
+            
+                <a class="link dim f6 f5-l dib mr3 mr4-l white" 
+                    href="/categories" 
+                    title="分类">
+                    分类
+                </a>
+            
+                <a class="link dim f6 f5-l dib mr3 mr4-l white" 
+                    href="/archives" 
+                    title="归档">
+                    归档
+                </a>
+            
+                <a class="link dim f6 f5-l dib mr3 mr4-l white" 
+                    href="/about.html" 
+                    title="关于我">
+                    关于我
+                </a>
+            
+        </div>
+    </nav>
+
+    <!-- Title -->
+    <div class="w-100 mw8 center vh-40 dt">
+        <div class="dtc v-mid white">
+            <h1 class="f1-l f2-m tc tc-m tl-ns">数据仓库历史数据存储 - 拉链表</h1>
+            <p class="f4 fw3 pab-100px tc tc-m tl-ns">2019-11-23</p>
+        </div>
+    </div>
+
+    <!-- Icon -->
+    <div class="relative w-100 mw8 center white dn dn-m db-ns">
+        <i class="header-icon fa fa fa-battery-full"></i>
+    </div>
+</div>
+
+<!-- Content -->
+<div class="w-100 ph2 ph4-m ph5-l mv5 mv6-l">
+    <div class="content">
+        <div class="mw8 center">
+            <div class="cf">
+                <div class="fl w-100 w-70-l mw7 left fw3 lh-copy pr4-ns pr0-m post-content">
+                    <!-- Tags Vertical -->
+                    
+
+                    <!-- Main Post Content -->
+                    <h1 id="数据仓库历史数据存储-拉链表"><a href="#数据仓库历史数据存储-拉链表" class="headerlink" title="数据仓库历史数据存储-拉链表"></a><span id="title">数据仓库历史数据存储-拉链表</span></h1><p>假如我们有一个账号account表，我们需要在hive中存储（数据是从线上mysql读取binlog同步来的，是有明细变化的）</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">account表结构：account_id, username, followers_count, modified_at</span><br></pre></td></tr></table></figure>
+
+<p>我们经常使用的存储方式有快照表和流水表。快照表就是以时间为粒度（比如天），生成每个时间的全量数据快照；流水表则是记录数据的每一条具体的改变。</p>
+<h5 id="现在有一个需求：需要记录账号的历史变更情况"><a href="#现在有一个需求：需要记录账号的历史变更情况" class="headerlink" title="现在有一个需求：需要记录账号的历史变更情况"></a>现在有一个需求：需要记录账号的历史变更情况</h5><h4 id="快照表实现"><a href="#快照表实现" class="headerlink" title="快照表实现"></a>快照表实现</h4><p>这里以天为粒度，对每天账号最终的状态进行存储即可。</p>
+<p>在hive中，以天为分区存储，我们需要访问某天的历史状态，直接指定分区即可访问</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">-- 访问20190801时某个账号的状态</span><br><span class="line">select * from account_snapshot where ds = &quot;20190801&quot; and account_id = xxx</span><br></pre></td></tr></table></figure>
+
+<p>快照表的缺点是：当单表的数据量比较大时，每天存储全量的快照，会导致不必要的资源开支</p>
+<h4 id="流水表实现"><a href="#流水表实现" class="headerlink" title="流水表实现"></a>流水表实现</h4><p>流水表记录数据的每一条变化，来一条插入一条</p>
+<p>这种存储方法对数据的使用者不太友好</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">-- 查询20190801时某个账号的状态</span><br><span class="line">select * from (</span><br><span class="line">	select </span><br><span class="line">		*, </span><br><span class="line">		row_number over(partition by account_id order by modified_at desc) as ro</span><br><span class="line">	from account where modified_at &lt;= &quot;2019-08-02 00:00:00&quot; and account_id = xxx</span><br><span class="line">) where ro = 1</span><br></pre></td></tr></table></figure>
+
+<p>以上的两种方式，多多少少都存在问题，接下来介绍拉链表的使用</p>
+<h4 id="拉链表"><a href="#拉链表" class="headerlink" title="拉链表"></a>拉链表</h4><p>拉链表是维护历史状态、以及最新状态的一种方式。</p>
+<p>拉链表对快照表进行了优化，根据拉链粒度（一般为时间）的不同，去除了在粒度范围内不变的数据。</p>
+<p>拉链表可以维护两个时间（start_time, end_time），来标识当前记录是否还有效，以及更好的定位历史数据</p>
+<h5 id="实现前提："><a href="#实现前提：" class="headerlink" title="实现前提："></a>实现前提：</h5><p>首先要有某一时刻的全量数据，作为起始表</p>
+<p>其次要有流水表或者快照表两者其一，作为变化的依据</p>
+<h5 id="实现："><a href="#实现：" class="headerlink" title="实现："></a>实现：</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">-- 原始数据</span><br><span class="line">create table account(</span><br><span class="line">	account int ,</span><br><span class="line">	username varchar,</span><br><span class="line">	followers_count int ,</span><br><span class="line">	modified_at timestamp </span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">-- 创建拉链表</span><br><span class="line">create table account_zip(</span><br><span class="line">	account int ,</span><br><span class="line">	username varchar,</span><br><span class="line">	followers_count int ,</span><br><span class="line">	modified_at timestamp ,</span><br><span class="line">    start_time timestamp, -- 记录的有效起始时间</span><br><span class="line">    end_time timestamp, -- 记录的有效结束时间</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>今天是8.1，我们从7.31号的数据开始记录</p>
+<h5 id="首先我们将7-31号的数据导入我们的拉链表中"><a href="#首先我们将7-31号的数据导入我们的拉链表中" class="headerlink" title="首先我们将7.31号的数据导入我们的拉链表中"></a>首先我们将7.31号的数据导入我们的拉链表中</h5><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">insert into account_zip</span><br><span class="line">select </span><br><span class="line">	*, </span><br><span class="line">	&quot;2019-07-31 00:00:00&quot; as start_time ,</span><br><span class="line">	&quot;9999-12-31 00:00:00&quot; as end_time</span><br><span class="line">from </span><br><span class="line">account ;</span><br></pre></td></tr></table></figure>
+
+<p>这里的start_time指的是这条记录是在7.31改变生效的，end_time是指这条记录在9999-12-31前是有效的。导入拉链表后，表内的记录如下所示，<br><img src="https://img-blog.csdnimg.cn/20190801230240403.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2lmZW5nZ2VnZQ==,size_16,color_FFFFFF,t_70" alt="\[外链图片转存失败(img-BIIfQFUw-1564671396692)(C:\Users\mwf\AppData\Roaming\Typora\typora-user-images\1564665768962.png)\]"></p>
+<h5 id="接下来，我们在8-1的时候，对账号进行修改和新增"><a href="#接下来，我们在8-1的时候，对账号进行修改和新增" class="headerlink" title="接下来，我们在8.1的时候，对账号进行修改和新增"></a>接下来，我们在8.1的时候，对账号进行修改和新增</h5><p><img src="https://img-blog.csdnimg.cn/20190801230302345.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2lmZW5nZ2VnZQ==,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>左边是7.31的数据，右边是8.1的数据</p>
+<p>我们可以看到8.1进行了一条记录的修改（修改mwf的followers_account）和一条记录的新增（新增account_id为5的用户）</p>
+<h5 id="针对修改来说："><a href="#针对修改来说：" class="headerlink" title="针对修改来说："></a>针对修改来说：</h5><p>在拉链中已经存在mwf的信息，8.1对他进行修改，</p>
+<p>我们可以将之前那条记录的end_time修改为8.1，表示他在8.1之后失效了</p>
+<p>然后将8.1的这次操作写入拉链表，他的start_time为8.1，end_time为9999-12-31</p>
+<h5 id="针对新增来说："><a href="#针对新增来说：" class="headerlink" title="针对新增来说："></a>针对新增来说：</h5><p>我们直接将它写入拉链表，start_time为8.1，end_time为9999-12-31</p>
+<p>8.1过后，我们的拉链表变为了如下版本：<br><img src="https://img-blog.csdnimg.cn/20190801230320383.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2lmZW5nZ2VnZQ==,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>以上我们就实现了一个拉链表</p>
+<h5 id="查询记录"><a href="#查询记录" class="headerlink" title="查询记录"></a>查询记录</h5><ul>
+<li>查询当前的有效记录</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select * from account_zip where end_time = &quot;9999-12-31 00:00:00&quot;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>如查询2019-07-31时的历史快照</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">-- 在7.31号前开始生效，且在7.31号当天时还没有失效， 此处通过两个时间刚好限定了范围</span><br><span class="line">select * from account_zip</span><br><span class="line">where start_time &lt;= &quot;2019-07-31 00:00:00&quot; and end_time &gt;= &quot;2019-07-31 00:00:00&quot;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="基于快照表生成拉链表"><a href="#基于快照表生成拉链表" class="headerlink" title="基于快照表生成拉链表"></a>基于快照表生成拉链表</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line">insert into account_zip_tmp </span><br><span class="line">-- 联合两个表，写入临时的拉链表中</span><br><span class="line">select * from (</span><br><span class="line">	-- 改变原有拉链表中 失效的数据</span><br><span class="line">	-- 这里用到了md5来比较数据是否相同</span><br><span class="line">	select </span><br><span class="line">		bak.account_id,</span><br><span class="line">		bak.username ,</span><br><span class="line">		bak.followers_count  ,</span><br><span class="line">		bak.modified_at, </span><br><span class="line">		bak.start_time</span><br><span class="line">		case </span><br><span class="line">		when bak.end_time = &quot;9999-12-31 00:00:00&quot; and  md5(concat(</span><br><span class="line">            coalesce(bak.username, &apos;NULL&apos;),</span><br><span class="line">            coalesce(bak.followers_count, &apos;NULL&apos;),</span><br><span class="line">            coalesce(bak.modified_at, &apos;NULL&apos;)</span><br><span class="line">         )) != md5(concat(</span><br><span class="line">              coalesce(new.username, &apos;NULL&apos;),</span><br><span class="line">              coalesce(new.followers_count, &apos;NULL&apos;),</span><br><span class="line">              coalesce(new.modified_at, &apos;NULL&apos;)</span><br><span class="line">		)) </span><br><span class="line">		then &quot;2019-07-31 00:00:00&quot; </span><br><span class="line">		else bak.end_time</span><br><span class="line">		end as end_time </span><br><span class="line">	from account_zip as bak </span><br><span class="line">	left join (</span><br><span class="line">		select * from account_snapshot where ds = &quot;20190801&quot;</span><br><span class="line">	) as new on bak.account_id = new.account_id</span><br><span class="line">	</span><br><span class="line">	union </span><br><span class="line">	-- 写入修改或新增的数据</span><br><span class="line">	select </span><br><span class="line">		a.account_id,</span><br><span class="line">		a.username ,</span><br><span class="line">		a.followers_count  ,</span><br><span class="line">		a.modified_at, </span><br><span class="line">		&quot;2019-07-31 00:00:00&quot; as start_time, </span><br><span class="line">        &quot;9999-12-31 00:00:00&quot; as end_time</span><br><span class="line">    from (   </span><br><span class="line">        select * from account_snapshot where ds = &quot;20190801&quot;</span><br><span class="line">    ) as a </span><br><span class="line">    left join (</span><br><span class="line">        select </span><br><span class="line">        *</span><br><span class="line">        from account_zip</span><br><span class="line">        where end_time = &quot;9999-12-31 00:00:00&quot;</span><br><span class="line">    ) on a.account_id = b.account_id</span><br><span class="line">	where md5(concat(</span><br><span class="line">            coalesce(a.username, &apos;NULL&apos;),</span><br><span class="line">            coalesce(a.followers_count, &apos;NULL&apos;),</span><br><span class="line">            coalesce(a.modified_at, &apos;NULL&apos;)</span><br><span class="line">         )) != md5(concat(</span><br><span class="line">              coalesce(b.username, &apos;NULL&apos;),</span><br><span class="line">              coalesce(b.followers_count, &apos;NULL&apos;),</span><br><span class="line">              coalesce(b.modified_at, &apos;NULL&apos;)</span><br><span class="line">		)) </span><br><span class="line">)；</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">-- 将临时拉链表写回拉链表</span><br><span class="line">insert overwrite table account_zip</span><br><span class="line">select * from account_zip_tmp</span><br></pre></td></tr></table></figure>
+
+
+
+<h5 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h5><h5 id="https-www-jianshu-com-p-799252156379"><a href="#https-www-jianshu-com-p-799252156379" class="headerlink" title="https://www.jianshu.com/p/799252156379"></a><a href="https://www.jianshu.com/p/799252156379" target="_blank" rel="noopener">https://www.jianshu.com/p/799252156379</a></h5><br>
+
+<p><font color= "gree">实践出真知 ！</font></p>
+<hr><br>
+
+<p><a href="#title">回到顶部</a></p>
+
+                    
+                    <!-- Tags Bottom -->
+                    
+
+                    <!-- Comments -->
+                    
+
+
+
+                </div>
+                <div class="fl w-100 w-30-l center fw3 lh-copy pl4-ns tl black-50">
+                    
+                    <hr class="dn-l mw4 black-50 mt5" />
+                    
+                    <!-- Widget 1: About -->
+                    <div class="mt5 mt0-l">
+    <article class="dt db-l mw8 mw8-m mw5-ns center ml0-l bg-white mv3">
+        <div class="dn dtc-m db-l v-mid tc pr4 pr0-l" style="min-width: 6rem;">
+            <img src="https://avatar.csdnimg.cn/E/7/E/1_ifenggege.jpg" class="mb4-l br-100 h3 w3 h4-l w4-l dib" title="upupfeng">
+        </div>
+        <div class="dtc db-l v-mid lh-copy measure center f6 black-50 tj">
+            贵有恒，要坚持。
+        </div>
+    </article>
+</div>
+
+                    <hr class="dn-l mw4 black-50 mt5" />
+                    
+                    <!-- Widget 2: Categories -->
+                    
+                        <div class="mt5 tc tl-l">
+    <h3>分类</h3>
+    
+        <p>
+            <a href="/categories/数据仓库/">数据仓库</a>
+        </p>
+    
+</div>
+
+
+                        <hr class="dn-l mw4 black-50 mt5" />
+                    
+
+                    <!-- Widget 3: Recent Posts -->
+                    <div class="mt5 tc tl-l">
+    <h3>近期文章</h3>
+    
+        <p>
+            <a href="/2019/11/23/%E6%95%B0%E6%8D%AE%E4%BB%93%E5%BA%93-%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5/">数据仓库-数据同步</a>
+        </p>
+    
+        <p>
+            <a href="/2019/11/23/%E4%B8%80%E6%96%87%E4%BA%86%E8%A7%A3%E6%95%B0%E6%8D%AE%E4%BB%93%E5%BA%93/">一文了解数据仓库</a>
+        </p>
+    
+        <p>
+            <a href="/2019/11/23/%E6%95%B0%E6%8D%AE%E4%BB%93%E5%BA%93%E5%8E%86%E5%8F%B2%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8-%E6%8B%89%E9%93%BE%E8%A1%A8/">数据仓库历史数据存储 - 拉链表</a>
+        </p>
+    
+        <p>
+            <a href="/2019/11/23/%E4%B8%AA%E4%BA%BA%E5%8D%9A%E5%AE%A2%E7%BD%91%E7%AB%99%E6%90%AD%E5%BB%BA/">个人博客网站搭建</a>
+        </p>
+    
+        <p>
+            <a href="/2019/11/23/hello-world/">Hello World</a>
+        </p>
+    
+</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Footer -->
+<div class="bg-1 ph2 ph5-ns pv5">
+        <div class="mv8">
+            <div class="center tc">
+                
+                    <div class="dib mh3">
+                        <a class="f3 f2-ns white dim" href="https://github.com/upupfeng" target="_blank">
+                            <i class="fa fa-github"></i>
+                        </a>
+                    </div>
+                
+            </div>
+            <div class="f6 f5-ns center tc white pt5 fw3">
+                upupfeng
+            </div>
+        </div>
+    </div>
+
+<!-- After Footer -->
+<!-- Disqus Comments -->
+
+
+
+</body>
+
+</html>
